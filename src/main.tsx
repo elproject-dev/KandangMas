@@ -1,0 +1,9 @@
+import { createRoot } from "react-dom/client";
+import { setBaseUrl } from "@/lib/supabase-client-react";
+import App from "./App";
+import "./index.css";
+
+// Configure API base URL
+setBaseUrl((import.meta as any).env?.PROD ? (import.meta as any).env?.VITE_API_URL ?? null : null);
+
+createRoot(document.getElementById("root")!).render(<App />);
