@@ -15,7 +15,7 @@ import ExcelJS from "exceljs";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Users, Receipt, Calendar as CalendarIcon, TrendingUp, Download, Plus, Trash2 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Filesystem, Directory, Encoding } from "@capacitor/filesystem";
+import { Filesystem, Directory } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
 import { Capacitor } from "@capacitor/core";
 import { useToast } from "@/hooks/use-toast";
@@ -624,7 +624,6 @@ export function Dashboard() {
         { header: 'Qty', key: 'qty', width: 6 },
         { header: 'Price', key: 'harga', width: 12 },
         { header: 'Total', key: 'total', width: 12 },
-        { header: 'Grand Total', key: 'subtotal', width: 18 },
       ];
 
       const marginColumns = [
@@ -717,8 +716,13 @@ export function Dashboard() {
         // Calculate total discount for the transaction
         const subtotalValue = t.subtotal || 0;
         const totalDiscount = t.discount ? (subtotalValue * (t.discount / 100)) : 0;
-        
-        let isFirstItem = true;
+
+        const transactionSalesId = isAdminExport
+          ? (isAllSales
+              ? (salesIdMap.get(String(t.userId ?? "")) || "-")
+              : (adminSalesOptions.find((x) => x.userId === selectedSalesUserId)?.salesId || "-"))
+          : (salesId || '-');
+
         t.items?.forEach((item: any) => {
           const itemTotal = (item.price || 0) * (item.quantity || 0);
           
@@ -741,34 +745,26 @@ export function Dashboard() {
           const itemMargin = (item.price - itemHpp) * (item.quantity || 0);
           
           const row = worksheet.addRow({
-            tanggal: isFirstItem ? formattedDate : '',
-            jam: isFirstItem ? time : '',
-            idPelanggan: isFirstItem ? (t.customerCode || '-') : '',
-            salesId: isFirstItem
-              ? (isAdminExport
-                  ? (isAllSales
-                      ? (salesIdMap.get(String(t.userId ?? "")) || "-")
-                      : (adminSalesOptions.find((x) => x.userId === selectedSalesUserId)?.salesId || "-"))
-                  : (salesId || '-'))
-              : '',
-            namaPelanggan: isFirstItem ? (t.customerName || '-') : '',
-            noTelp: isFirstItem ? (t.customerPhone || '-') : '',
-            alamat: isFirstItem ? (t.customerAddress || '-') : '',
-            kecamatan: isFirstItem ? (t.customerKecamatan || '-') : '',
-            kabupaten: isFirstItem ? (t.customerKab || '-') : '',
+            tanggal: formattedDate,
+            jam: time,
+            idPelanggan: t.customerCode || '-',
+            salesId: transactionSalesId,
+            namaPelanggan: t.customerName || '-',
+            noTelp: t.customerPhone || '-',
+            alamat: t.customerAddress || '-',
+            kecamatan: t.customerKecamatan || '-',
+            kabupaten: t.customerKab || '-',
             namaProduk: item.productName || item.serviceName || '-',
             varian: showVariant ? (item.tierLabel || '-') : undefined,
             qty: item.quantity || 0,
             harga: item.price || 0,
             total: itemTotal,
-            subtotal: isFirstItem ? (t.total || 0) : '',
+            subtotal: t.total || 0,
             hpp: showMarginInfo ? itemHpp * (item.quantity || 0) : undefined,
             margin: showMarginInfo ? itemMargin : undefined,
-            periodeBulan: isFirstItem ? (t.periodeMonth ? ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"][(t.periodeMonth - 1)] || t.periodeMonth : '-') : '',
-            periodeTahun: isFirstItem ? (t.periodeYear || '-') : '',
+            periodeBulan: t.periodeMonth ? ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"][(t.periodeMonth - 1)] || t.periodeMonth : '-',
+            periodeTahun: t.periodeYear || '-',
           });
-          const wasFirstItem = isFirstItem;
-          isFirstItem = false;
  
           // Apply alternating fill color + border per row (no merge)
           for (let c = 1; c <= lastColumnIndex; c++) {
@@ -786,31 +782,29 @@ export function Dashboard() {
             };
           }
 
-          // Write time-only as a fraction of a day (only for first item row to avoid duplicate)
-          if (wasFirstItem && createdAt) {
+          // Write time-only as a fraction of a day
+          if (createdAt) {
             const timeFraction =
               (createdAt.getHours() * 3600 + createdAt.getMinutes() * 60 + createdAt.getSeconds()) / 86400;
             row.getCell(2).value = timeFraction;
             row.getCell(2).numFmt = 'hh:mm';
           }
 
-          // Force phone number as text and center-align it (only for first item row)
-          if (wasFirstItem) {
-            const salesIdIdx = getColIndex('salesId');
-            const phoneIdx = getColIndex('noTelp');
-            
-            if (salesIdIdx > 0) {
-              row.getCell(salesIdIdx).numFmt = '@';
-              row.getCell(salesIdIdx).alignment = { horizontal: 'center', vertical: 'middle' };
-            }
-            if (phoneIdx > 0) {
-              row.getCell(phoneIdx).numFmt = '@';
-              row.getCell(phoneIdx).alignment = { horizontal: 'center', vertical: 'middle' };
-              if (row.getCell(phoneIdx).value == null || row.getCell(phoneIdx).value === '') {
-                row.getCell(phoneIdx).value = '-';
-              } else {
-                row.getCell(phoneIdx).value = String(row.getCell(phoneIdx).value);
-              }
+          // Force phone number as text and center-align it
+          const salesIdIdx = getColIndex('salesId');
+          const phoneIdx = getColIndex('noTelp');
+          
+          if (salesIdIdx > 0) {
+            row.getCell(salesIdIdx).numFmt = '@';
+            row.getCell(salesIdIdx).alignment = { horizontal: 'center', vertical: 'middle' };
+          }
+          if (phoneIdx > 0) {
+            row.getCell(phoneIdx).numFmt = '@';
+            row.getCell(phoneIdx).alignment = { horizontal: 'center', vertical: 'middle' };
+            if (row.getCell(phoneIdx).value == null || row.getCell(phoneIdx).value === '') {
+              row.getCell(phoneIdx).value = '-';
+            } else {
+              row.getCell(phoneIdx).value = String(row.getCell(phoneIdx).value);
             }
           }
         });
@@ -883,47 +877,64 @@ export function Dashboard() {
       });
 
       const buffer = await workbook.xlsx.writeBuffer();
-      
-      if (Capacitor.isNativePlatform()) {
-        try {
-          const base64Data = btoa(
-            new Uint8Array(buffer).reduce((data, byte) => data + String.fromCharCode(byte), '')
-          );
 
-          const savedFile = await Filesystem.writeFile({
+      const arrayBufferToBase64 = (buf: ArrayBuffer) => {
+        const bytes = new Uint8Array(buf);
+        let binary = '';
+        const chunkSize = 0x8000;
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+          binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+        }
+        return btoa(binary);
+      };
+      
+      const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__ !== undefined;
+
+      if (isTauri) {
+        try {
+          const filePath = await save({
+            defaultPath: filename,
+            filters: [{ name: 'Excel', extensions: ['xlsx'] }]
+          });
+          
+          if (filePath) {
+            const uint8Buffer = new Uint8Array(buffer as ArrayBuffer);
+            await writeFile(filePath, uint8Buffer);
+            toast({
+              title: "Berhasil",
+              description: "Laporan berhasil disimpan",
+            });
+          }
+        } catch (err) {
+          console.error('Error saving in Tauri:', err);
+          toast({
+            title: "Gagal",
+            description: "Gagal menyimpan laporan",
+            variant: "destructive"
+          });
+        }
+      } else if (Capacitor.isNativePlatform()) {
+        try {
+          const base64 = arrayBufferToBase64(buffer as ArrayBuffer);
+          const result = await Filesystem.writeFile({
             path: filename,
-            data: base64Data,
+            data: base64,
             directory: Directory.Cache,
           });
 
           await Share.share({
-            title: 'Download Laporan',
-            text: `Laporan Penjualan: ${filename}`,
-            url: savedFile.uri,
-            dialogTitle: 'Simpan atau Bagikan Laporan',
+            title: 'Laporan Penjualan',
+            text: 'File Excel laporan penjualan',
+            url: result.uri,
+            dialogTitle: 'Simpan / Bagikan Laporan',
           });
         } catch (err) {
-          console.error('Error sharing file:', err);
-          alert('Gagal mengunduh laporan di Android');
-        }
-      } else if ((window as any).__TAURI_INTERNALS__) {
-        try {
-          console.log('Tauri download started', { filename });
-          // Fallback if Tauri APIs are not available or should be handled differently
-          const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-          const url = URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = filename;
-          link.click();
-          URL.revokeObjectURL(url);
-          
+          console.error('Error saving/sharing in Capacitor:', err);
           toast({
-            title: "Berhasil",
-            description: "Laporan berhasil diunduh",
+            title: "Gagal",
+            description: "Gagal mengunduh laporan di Android",
+            variant: "destructive",
           });
-        } catch (err) {
-          console.error('Error in Tauri download fallback:', err);
         }
       } else {
         const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -931,7 +942,9 @@ export function Dashboard() {
         const link = document.createElement('a');
         link.href = url;
         link.download = filename;
+        document.body.appendChild(link);
         link.click();
+        link.remove();
         URL.revokeObjectURL(url);
       }
       
