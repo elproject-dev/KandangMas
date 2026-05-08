@@ -16,6 +16,7 @@ import { Kasir } from "@/pages/kasir";
 import { Transaksi } from "@/pages/transaksi";
 import { Pelanggan } from "@/pages/pelanggan";
 import { Layanan } from "@/pages/layanan";
+import { JadwalKunjungan } from "@/pages/jadwal-kunjungan";
 import Setting from "@/pages/setting";
 
 import { isLoggedIn, onAuthStateChange } from "@/lib/auth";
@@ -108,6 +109,7 @@ function Router() {
               <Route path="/transaksi" component={Transaksi} />
               <Route path="/pelanggan" component={Pelanggan} />
               <Route path="/layanan" component={Layanan} />
+              <Route path="/jadwal-kunjungan" component={JadwalKunjungan} />
               <Route path="/setting" component={Setting} />
               <Route component={NotFound} />
             </Switch>

@@ -1,8 +1,9 @@
 import { useState, useMemo, useEffect } from "react";
-import { useListCustomers, useCreateCustomer, useUpdateCustomer, useDeleteCustomer, useListTransactions, getListCustomersQueryKey } from "@/lib/supabase-client-react";
+import { useListCustomers, useCreateCustomer, useUpdateCustomer, useDeleteCustomer, useUpdateCustomerAdmin, useDeleteCustomerAdmin, useListTransactions, getListCustomersQueryKey } from "@/lib/supabase-client-react";
 import { formatRupiah, formatDate, normalizeCustomerCode } from "@/lib/format";
 import { useQueryClient } from "@tanstack/react-query";
 import { getAllSettings } from "@/lib/supabase-service";
+import { supabase } from "@/lib/supabase";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -138,8 +139,12 @@ export function Pelanggan() {
   const { data: allCustomers } = useListCustomers((adminMode && isAdmin) ? { adminAll: true } : undefined);
 
   const createCustomer = useCreateCustomer();
-  const updateCustomer = useUpdateCustomer();
-  const deleteCustomer = useDeleteCustomer();
+  const updateCustomerRegular = useUpdateCustomer();
+  const deleteCustomerRegular = useDeleteCustomer();
+  const updateCustomerAdmin = useUpdateCustomerAdmin();
+  const deleteCustomerAdmin = useDeleteCustomerAdmin();
+  const updateCustomer = (adminMode && isAdmin) ? updateCustomerAdmin : updateCustomerRegular;
+  const deleteCustomer = (adminMode && isAdmin) ? deleteCustomerAdmin : deleteCustomerRegular;
 
   // Auto-generate next customer code (CTM-{PREFIX}00001 format) using ALL customers
   const nextCustomerCode = useMemo(() => {
@@ -175,7 +180,8 @@ export function Pelanggan() {
 
 
   const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: getListCustomersQueryKey(search || undefined) });
+    queryClient.invalidateQueries({ queryKey: ["customers"] });
+    queryClient.invalidateQueries({ queryKey: ["visit_schedules"] });
   };
 
   const openCreate = () => {
@@ -199,6 +205,22 @@ export function Pelanggan() {
       const data = { code: form.code || null, name: form.name, phone: form.phone, address: form.address || null, kab: form.kab || null, kecamatan: form.kecamatan || null, notes: form.notes || null };
       if (editId) {
         await updateCustomer.mutateAsync({ id: editId, data });
+        // Sync customer data to visit_schedules
+        try {
+          await supabase
+            .from('visit_schedules')
+            .update({
+              customer_name: data.name,
+              customer_phone: data.phone,
+              customer_code: data.code,
+              customer_address: data.address,
+              customer_kecamatan: data.kecamatan,
+              customer_kab: data.kab,
+            })
+            .eq('customer_id', editId);
+        } catch (syncErr) {
+          console.error('Error syncing to visit_schedules:', syncErr);
+        }
         toast({ title: "Data pelanggan diperbarui", variant: "primary" });
       } else {
         await createCustomer.mutateAsync({ data });
@@ -311,11 +333,6 @@ export function Pelanggan() {
                       <p className="font-bold text-sm sm:text-base truncate ml-4.5">
                         {c.name.length > 15 ? `${c.name.substring(0, 15)}...` : c.name}
                       </p>
-                      {c.code && (
-                        <Badge variant="outline" className="text-[9px] py-0 px-1 font-mono bg-muted/50">
-                          {normalizeCustomerCode(c.code)}
-                        </Badge>
-                      )}
                     </div>
                     <p className="text-xs text-muted-foreground flex items-center gap-1.5 truncate mb-0.5">
                       <Phone className="w-3 h-3 text-primary/60" />
@@ -368,11 +385,13 @@ export function Pelanggan() {
                   </div>
 
                   <div className="flex flex-wrap gap-1.5 justify-end">
+                    {c.code && (
+                      <Badge variant="default" className="bg-primary text-primary-foreground text-[10px] py-0 px-1.5 font-semibold leading-none h-6 flex items-center">
+                        {normalizeCustomerCode(c.code)}
+                      </Badge>
+                    )}
                     <Badge variant="default" className="bg-primary text-primary-foreground text-[10px] py-0 px-1.5 font-semibold">
                       {c.visitCount || 0}x order
-                    </Badge>
-                    <Badge variant="outline" className="bg-yellow-50 text-yellow-700 border-yellow-100 text-[10px] py-0 px-1.5 font-semibold">
-                      {formatRupiah(c.totalSpend || 0)}
                     </Badge>
                   </div>
                 </div>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useListTransactions, useDeleteTransaction, getListTransactionsQueryKey } from "@/lib/supabase-client-react";
 import { formatRupiah, formatDate } from "@/lib/format";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Receipt, Trash2 } from "lucide-react";
+import { Receipt, Trash2, Filter, X } from "lucide-react";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,9 +23,18 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAdminMode } from "@/components/admin-mode-provider";
+import { getSalesIdsAdmin } from "@/lib/supabase-service";
+import { supabase } from "@/lib/supabase";
 
 function truncateText(text: string, maxLength: number): string {
   if (text.length <= maxLength) return text;
@@ -34,8 +43,9 @@ function truncateText(text: string, maxLength: number): string {
 
 export function Transaksi() {
   const { adminMode, isAdmin } = useAdminMode();
+  const showAdminControls = adminMode && isAdmin;
   const { data: transactions, isLoading } = useListTransactions(
-    (adminMode && isAdmin) ? { adminAll: true } : undefined
+    showAdminControls ? { adminAll: true } : undefined
   );
   const [selectedTransaction, setSelectedTransaction] = useState<NonNullable<typeof transactions>[number] | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -44,11 +54,57 @@ export function Transaksi() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const deleteTransaction = useDeleteTransaction();
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
+  const [salesOptions, setSalesOptions] = useState<Array<{ userId: string; salesId: string }>>([]);
+  const [selectedSalesFilter, setSelectedSalesFilter] = useState<string>("all");
 
-  const totalPages = transactions ? Math.ceil(transactions.length / itemsPerPage) : 0;
+  useEffect(() => {
+    const loadSales = async () => {
+      if (!(adminMode && isAdmin)) return;
+      try {
+        const entries = await getSalesIdsAdmin();
+        const normalized = (entries || [])
+          .map((e) => ({ userId: e.userId, salesId: String(e.salesId ?? "") }))
+          .sort((a, b) => (a.salesId || a.userId).localeCompare(b.salesId || b.userId));
+        setSalesOptions(normalized);
+      } catch (error) {
+        console.error('Error loading sales options:', error);
+      }
+    };
+    loadSales();
+  }, [adminMode, isAdmin]);
+
+  const filteredTransactions = transactions?.filter(trx => {
+    if (selectedSalesFilter === "all") return true;
+    return trx.userId === selectedSalesFilter;
+  }) || [];
+
+  const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const currentTransactions = transactions?.slice(startIndex, endIndex) || [];
+  const currentTransactions = filteredTransactions.slice(startIndex, endIndex);
+
+  const handleDeleteAllBySales = async () => {
+    if (selectedSalesFilter === "all") return;
+    
+    setIsDeletingAll(true);
+    try {
+      const { error } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('user_id', selectedSalesFilter);
+
+      if (error) throw error;
+
+      await queryClient.invalidateQueries({ queryKey: getListTransactionsQueryKey() });
+      toast({ title: "Semua riwayat sales berhasil dihapus", variant: "primary" });
+    } catch (error) {
+      console.error('Error deleting all by sales:', error);
+      toast({ title: "Gagal menghapus riwayat", variant: "destructive" });
+    } finally {
+      setIsDeletingAll(false);
+    }
+  };
 
   const handleDelete = (id: number) => {
     deleteTransaction.mutate(
@@ -72,6 +128,22 @@ export function Transaksi() {
           <h1 className="text-xl font-bold tracking-tight">Riwayat Transaksi</h1>
           <p className="text-muted-foreground text-[10px] sm:text-xs">Daftar semua transaksi yang telah dilakukan.</p>
         </div>
+        
+        {showAdminControls && (
+          <div className="flex items-center gap-2">
+            <Select value={selectedSalesFilter} onValueChange={(val) => { setSelectedSalesFilter(val); setCurrentPage(1); }}>
+              <SelectTrigger className="w-full sm:w-[180px] h-9 bg-card/50 border-none shadow-sm">
+                <SelectValue placeholder="Semua Sales" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Semua Sales</SelectItem>
+                {salesOptions.map(sales => (
+                  <SelectItem key={sales.userId} value={sales.userId}>{sales.salesId || sales.userId}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
       </div>
 
       <div className="space-y-2 sm:space-y-3">
@@ -163,7 +235,7 @@ export function Transaksi() {
             {totalPages > 1 && (
               <div className="flex items-center justify-between pt-4">
                 <p className="text-xs text-muted-foreground ml-1">
-                  {startIndex + 1}-{Math.min(endIndex, transactions.length)} dari {transactions.length}
+                  {startIndex + 1}-{Math.min(endIndex, filteredTransactions.length)} dari {filteredTransactions.length}
                 </p>
                 <div className="flex gap-2">
                   <Button

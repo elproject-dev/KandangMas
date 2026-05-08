@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState, memo } from "react";
 import { Link, useLocation } from "wouter";
-import { Home, Receipt, Calendar, Users, Menu, ShoppingBag, X, Settings, History } from "lucide-react";
+import { Home, Receipt, Calendar, Users, Menu, ShoppingBag, X, Settings, History, Clock } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -87,6 +87,7 @@ export function Layout({ children }: LayoutProps) {
     { label: "Dashboard", href: "/", icon: Home },
     { label: "Order", href: "/kasir", icon: Receipt },
     { label: "Pelanggan", href: "/pelanggan", icon: Users },
+    { label: "Jadwal", href: "/jadwal-kunjungan", icon: Clock },
   ], []);
 
   const moreItems = useMemo(() => [

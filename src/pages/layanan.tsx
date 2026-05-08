@@ -17,6 +17,8 @@ import * as XLSX from "xlsx";
 import { Filesystem, Directory } from "@capacitor/filesystem";
 import { Share } from "@capacitor/share";
 import { Capacitor } from "@capacitor/core";
+import { save } from "@tauri-apps/plugin-dialog";
+import { writeFile } from "@tauri-apps/plugin-fs";
 import { useAdminMode } from "@/components/admin-mode-provider";
 
 interface ProductForm {
@@ -92,6 +94,22 @@ export function Layanan() {
       worksheet["!cols"] = wscols;
 
       const fileName = "sample_produk_tokopembantu.xlsx";
+
+      const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__ !== undefined;
+
+      if (isTauri) {
+        const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+        const filePath = await save({
+          defaultPath: fileName,
+          filters: [{ name: 'Excel', extensions: ['xlsx'] }]
+        });
+        
+        if (filePath) {
+          await writeFile(filePath, new Uint8Array(wbout as ArrayBuffer));
+          toast({ title: "Sample Excel berhasil disimpan" });
+        }
+        return;
+      }
 
       if (Capacitor.isNativePlatform()) {
         const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'base64' });

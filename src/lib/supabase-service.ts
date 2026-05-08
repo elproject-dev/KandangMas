@@ -218,10 +218,11 @@ export async function deleteProduct(id: number, options?: { allowGlobal?: boolea
 // Customers
 export async function getCustomers(search?: string): Promise<Customer[]> {
   const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return [];
   let query = supabase
     .from('customers')
     .select('*')
-    .eq('user_id', user?.id)
+    .eq('user_id', user.id)
     .order('created_at', { ascending: false });
 
   if (search) {
@@ -359,7 +360,48 @@ export async function deleteCustomer(id: number): Promise<void> {
     .delete()
     .eq('id', id)
     .eq('user_id', user?.id);
-  
+
+  if (error) throw error;
+}
+
+export async function updateCustomerAdmin(id: number, data: Partial<Customer>): Promise<Customer> {
+  const { data: result, error } = await supabase
+    .from('customers')
+    .update({
+      code: data.code,
+      name: data.name,
+      phone: data.phone,
+      address: data.address,
+      kab: data.kab,
+      kecamatan: data.kecamatan,
+      notes: data.notes,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw error;
+  return {
+    id: result.id,
+    code: result.code,
+    name: result.name,
+    phone: result.phone,
+    address: result.address,
+    kab: result.kab,
+    kecamatan: result.kecamatan,
+    notes: result.notes,
+    created_at: result.created_at,
+    updated_at: result.updated_at,
+  };
+}
+
+export async function deleteCustomerAdmin(id: number): Promise<void> {
+  const { error } = await supabase
+    .from('customers')
+    .delete()
+    .eq('id', id);
+
   if (error) throw error;
 }
 

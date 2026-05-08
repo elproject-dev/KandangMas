@@ -50,6 +50,7 @@ export default function Setting() {
   const [isSavingPrefix, setIsSavingPrefix] = useState(false);
 
   const [isDeletingData, setIsDeletingData] = useState(false);
+  const [isDeletingSalesData, setIsDeletingSalesData] = useState(false);
 
   useEffect(() => {
     const loadData = async () => {
@@ -185,6 +186,35 @@ export default function Setting() {
       });
     } finally {
       setIsDeletingData(false);
+    }
+  };
+
+  const handleDeleteSalesData = async () => {
+    if (remoteSelectedUserId === "all") return;
+    
+    setIsDeletingSalesData(true);
+    try {
+      const { error } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('user_id', remoteSelectedUserId);
+
+      if (error) throw error;
+
+      toast({
+        title: "Berhasil",
+        description: "Semua riwayat penjualan sales berhasil dihapus",
+        variant: "primary",
+      });
+    } catch (error: any) {
+      console.error('Error deleting sales transactions:', error);
+      toast({
+        title: "Gagal",
+        description: error?.message || "Terjadi kesalahan saat menghapus riwayat",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeletingSalesData(false);
     }
   };
 
@@ -582,46 +612,51 @@ export default function Setting() {
                           disabled={remoteLoading || remoteSelectedUserId === "all"}
                         />
                       </div>
+
+                      {remoteSelectedUserId !== "all" && (
+                        <div className="mt-4 pt-4 border-t border-border/50">
+                          <div className="flex items-center justify-between mb-3">
+                            <div className="space-y-0.5">
+                              <p className="text-sm font-medium text-destructive">Hapus Riwayat Sales Ini</p>
+                              <p className="text-xs text-muted-foreground">Hapus semua transaksi untuk sales terpilih</p>
+                            </div>
+                          </div>
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <motion.div whileTap={{ scale: 0.95 }} className="w-full">
+                                <Button 
+                                  variant="destructive" 
+                                  className="w-full h-9 text-xs"
+                                  disabled={isDeletingSalesData}
+                                >
+                                  {isDeletingSalesData ? "Menghapus..." : "Hapus Riwayat Sales"}
+                                </Button>
+                              </motion.div>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent className="rounded-2xl">
+                              <AlertDialogHeader>
+                                <AlertDialogTitle className="text-destructive">Hapus Riwayat Sales?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Tindakan ini akan menghapus semua riwayat transaksi untuk sales{" "}
+                                  <strong>{remoteSalesOptions.find(s => s.userId === remoteSelectedUserId)?.salesId || remoteSelectedUserId}</strong>.
+                                  <p className="mt-2 text-destructive font-semibold">Tindakan ini TIDAK DAPAT dibatalkan!</p>
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel className="rounded-xl">Batal</AlertDialogCancel>
+                                <AlertDialogAction 
+                                  onClick={handleDeleteSalesData}
+                                  className="bg-destructive hover:bg-destructive/90 rounded-xl"
+                                >
+                                  Ya, Hapus
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        </div>
+                      )}
                     </div>
                   )}
-
-                  <div className="flex items-center gap-2 mb-3">
-                    <div>
-                      <p className="text-sm font-medium text-destructive">Hapus Riwayat Penjualan</p>
-                      <p className="text-xs text-muted-foreground">Hapus semua riwayat transaksi penjualan</p>
-                    </div>
-                  </div>
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <motion.div whileTap={{ scale: 0.95 }} className="w-full">
-                        <Button 
-                          variant="destructive" 
-                          className="w-full"
-                          disabled={isDeletingData}
-                        >
-                          {isDeletingData ? "Menghapus..." : "Hapus Riwayat Penjualan"}
-                        </Button>
-                      </motion.div>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle className="text-destructive">Hapus Riwayat Penjualan?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Tindakan ini akan menghapus SEMUA riwayat transaksi penjualan dari database.
-                          <p className="mt-2 text-destructive font-semibold">Tindakan ini TIDAK DAPAT dibatalkan!</p>
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Batal</AlertDialogCancel>
-                        <AlertDialogAction 
-                          onClick={handleDeleteAllData}
-                          className="bg-destructive hover:bg-destructive/90"
-                        >
-                          Ya, Hapus Riwayat
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
                 </>
               )}
             </div>

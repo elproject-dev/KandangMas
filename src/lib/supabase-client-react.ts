@@ -127,6 +127,18 @@ export function useDeleteCustomer() {
   });
 }
 
+export function useUpdateCustomerAdmin() {
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => supabaseService.updateCustomerAdmin(id, data),
+  });
+}
+
+export function useDeleteCustomerAdmin() {
+  return useMutation({
+    mutationFn: ({ id }: { id: number }) => supabaseService.deleteCustomerAdmin(id),
+  });
+}
+
 export function getListTransactionsQueryKey(params?: { startDate?: string; endDate?: string; customerId?: string; userId?: string; adminAll?: boolean }) {
   return ["transactions", params ?? {}] as const;
 }
