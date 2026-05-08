@@ -59,6 +59,23 @@ export function Transaksi() {
   const [selectedSalesFilter, setSelectedSalesFilter] = useState<string>("all");
 
   useEffect(() => {
+    const channel = supabase
+      .channel('transactions_realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'transactions' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["transactions"] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
+  useEffect(() => {
     const loadSales = async () => {
       if (!(adminMode && isAdmin)) return;
       try {
@@ -96,7 +113,7 @@ export function Transaksi() {
 
       if (error) throw error;
 
-      await queryClient.invalidateQueries({ queryKey: getListTransactionsQueryKey() });
+      await queryClient.invalidateQueries({ queryKey: ["transactions"] });
       toast({ title: "Semua riwayat sales berhasil dihapus", variant: "primary" });
     } catch (error) {
       console.error('Error deleting all by sales:', error);
@@ -111,7 +128,7 @@ export function Transaksi() {
       { id },
       {
         onSuccess: async () => {
-          await queryClient.invalidateQueries({ queryKey: getListTransactionsQueryKey() });
+          await queryClient.invalidateQueries({ queryKey: ["transactions"] });
           toast({ title: "Transaksi dihapus", variant: "primary" });
         },
         onError: () => {

@@ -15,6 +15,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useNotifications } from "@/components/notification-provider";
 import { getSetting, getAllSettings } from "@/lib/supabase-service";
 import { motion } from "framer-motion";
+import { supabase } from "@/lib/supabase";
 
 export function Kasir() {
   const { toast } = useToast();
@@ -39,6 +40,23 @@ export function Kasir() {
 
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('products_realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'products' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["products"] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   // Auto-generate next customer code (CTM-{PREFIX}00001 format)
   const nextCustomerCode = useMemo(() => {

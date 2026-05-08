@@ -22,6 +22,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAdminMode } from "@/components/admin-mode-provider";
 import { save } from '@tauri-apps/plugin-dialog';
 import { writeFile } from '@tauri-apps/plugin-fs';
+import { supabase } from "@/lib/supabase";
 
 export function Dashboard() {
   const { toast } = useToast();
@@ -37,6 +38,37 @@ export function Dashboard() {
   const [salesId, setSalesId] = useState<string>("");
   const [adminSalesOptions, setAdminSalesOptions] = useState<Array<{ userId: string; salesId: string }>>([]);
   const [selectedSalesUserId, setSelectedSalesUserId] = useState<string>("all");
+
+  useEffect(() => {
+    const transactionsChannel = supabase
+      .channel('dashboard_transactions_realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'transactions' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["transactions"] });
+          queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+        }
+      )
+      .subscribe();
+
+    const ordersChannel = supabase
+      .channel('dashboard_orders_realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'orders' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["orders"] });
+          queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(transactionsChannel);
+      supabase.removeChannel(ordersChannel);
+    };
+  }, [queryClient]);
 
   // Load Sales ID from settings
   useEffect(() => {

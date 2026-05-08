@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useListProducts, useCreateProduct, useUpdateProduct, useDeleteProduct, getListProductsQueryKey } from "@/lib/supabase-client-react";
 import { formatRupiah, formatNumber, parseNumber } from "@/lib/format";
 import { useQueryClient } from "@tanstack/react-query";
@@ -20,6 +20,7 @@ import { Capacitor } from "@capacitor/core";
 import { save } from "@tauri-apps/plugin-dialog";
 import { writeFile } from "@tauri-apps/plugin-fs";
 import { useAdminMode } from "@/components/admin-mode-provider";
+import { supabase } from "@/lib/supabase";
 
 interface ProductForm {
   name: string;
@@ -46,6 +47,23 @@ export function Layanan() {
   const deleteProduct = useDeleteProduct();
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: getListProductsQueryKey() });
+
+  useEffect(() => {
+    const channel = supabase
+      .channel('products_realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'products' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["products"] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const [showImportDialog, setShowImportDialog] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);

@@ -129,6 +129,23 @@ export function JadwalKunjungan() {
     },
   });
 
+  useEffect(() => {
+    const channel = supabase
+      .channel('visit_schedules_realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'visit_schedules' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ["visit_schedules"] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
+
   const isSameLocalDay = (a: Date, b: Date) => {
     return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
   };
