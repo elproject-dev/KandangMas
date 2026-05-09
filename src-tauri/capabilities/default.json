@@ -22,6 +22,7 @@
         { "path": "$DOCUMENT/**" }
       ]
     },
-    "log:default"
+    "log:default",
+    "shell:allow-open"
   ]
 }

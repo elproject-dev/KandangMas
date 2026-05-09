@@ -15,6 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { useAdminMode } from "@/components/admin-mode-provider";
 import { supabase } from "@/lib/supabase";
+import { open as openShell } from "@tauri-apps/plugin-shell";
 
 interface VisitSchedule {
   id?: number;
@@ -64,6 +65,36 @@ export function JadwalKunjungan() {
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [customerSearch, setCustomerSearch] = useState("");
   const [detailSchedule, setDetailSchedule] = useState<VisitSchedule | null>(null);
+
+  const openExternal = async (url: string) => {
+    const normalizedUrl = (() => {
+      const s = String(url || "").trim();
+      if (!s) return "";
+      if (/^https?:\/\//i.test(s)) return s;
+      return `https://${s.replace(/^\/+/, "")}`;
+    })();
+
+    if (!normalizedUrl) {
+      toast({ title: "Link tidak valid", variant: "destructive" });
+      return;
+    }
+
+    const isTauri = typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__ !== undefined;
+    if (isTauri) {
+      try {
+        await openShell(normalizedUrl);
+      } catch (err) {
+        console.error("Failed to open URL in Tauri:", err);
+        toast({
+          title: "Gagal membuka link",
+          description: String((err as any)?.message ?? err ?? ""),
+          variant: "destructive",
+        });
+      }
+    } else {
+      window.open(normalizedUrl, "_blank");
+    }
+  };
 
   const { data: customers } = useListCustomers(adminMode && isAdmin ? { adminAll: true } : undefined);
 
@@ -474,16 +505,17 @@ export function JadwalKunjungan() {
                             )}
                             <div className="flex items-center gap-2 mt-0.5">
                               {schedule.customerMapUrl && (
-                                <a
-                                  href={schedule.customerMapUrl}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
+                                <button
+                                  type="button"
                                   className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                                  onClick={(e) => e.stopPropagation()}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    openExternal(schedule.customerMapUrl!);
+                                  }}
                                 >
                                   <MapPin className="w-3 h-3" />
                                   Lihat Maps
-                                </a>
+                                </button>
                               )}
                               {!isReadOnly && schedule.visited && (
                                 <Badge className="text-[10px] gap-1 bg-primary/10 text-primary border-0 inline-flex items-center ml-auto">
@@ -835,30 +867,28 @@ export function JadwalKunjungan() {
               {/* Footer Actions */}
               <div className="px-6 pb-5 pt-2 flex gap-2">
                 {detailSchedule.customerMapUrl && (
-                  <a
-                    href={detailSchedule.customerMapUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-1"
+                  <Button 
+                    className="flex-1 gap-2" 
+                    size="sm"
+                    onClick={() => openExternal(detailSchedule.customerMapUrl!)}
                   >
-                    <Button className="w-full gap-2" size="sm">
-                      <MapPin className="w-4 h-4" />
-                      Buka Google Maps
-                    </Button>
-                  </a>
+                    <MapPin className="w-4 h-4" />
+                    Buka Google Maps
+                  </Button>
                 )}
                 {detailSchedule.customerPhone && (
-                  <a
-                    href={`https://wa.me/${detailSchedule.customerPhone.replace(/^0/, '62').replace(/[^0-9]/g, '')}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-1"
+                  <Button 
+                    variant="outline" 
+                    className="flex-1 gap-2" 
+                    size="sm"
+                    onClick={() => {
+                      const waUrl = `https://wa.me/${detailSchedule.customerPhone!.replace(/^0/, '62').replace(/[^0-9]/g, '')}`;
+                      openExternal(waUrl);
+                    }}
                   >
-                    <Button variant="outline" className="w-full gap-2" size="sm">
-                      <Phone className="w-4 h-4" />
-                      Hubungi
-                    </Button>
-                  </a>
+                    <Phone className="w-4 h-4" />
+                    Hubungi
+                  </Button>
                 )}
               </div>
             </>
