@@ -52,6 +52,67 @@ export default function Setting() {
   const [isDeletingData, setIsDeletingData] = useState(false);
   const [isDeletingSalesData, setIsDeletingSalesData] = useState(false);
 
+  // Password change state
+  const [showChangePasswordDialog, setShowChangePasswordDialog] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+
+  const handleChangePassword = async () => {
+    if (!newPassword || !confirmPassword) {
+      toast({
+        title: "Input tidak valid",
+        description: "Password baru dan konfirmasi harus diisi",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: "Password tidak cocok",
+        description: "Konfirmasi password tidak sesuai dengan password baru",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      toast({
+        title: "Password terlalu pendek",
+        description: "Password minimal harus 6 karakter",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Berhasil",
+        description: "Password berhasil diperbarui",
+        variant: "primary",
+      });
+      setShowChangePasswordDialog(false);
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (error: any) {
+      toast({
+        title: "Gagal",
+        description: error?.message || "Terjadi kesalahan saat mengganti password",
+        variant: "destructive",
+      });
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -491,70 +552,137 @@ export default function Setting() {
             <CardDescription>Pengaturan keamanan akun dan data</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-3 border-b pb-4 border-border/50">
-              <div className="flex items-center gap-2">
-                <img src="/man.png" alt="User" className="w-4 h-4 object-contain" />
+            <div className="space-y-4 border-b pb-6 border-border/50">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 flex items-center justify-center overflow-hidden">
+                  <img src="/profile.png" alt="Profile" className="w-full h-full object-cover rounded-full" />
+                </div>
                 <div className="space-y-0.5">
-                  <p className="text-sm font-medium">User Login</p>
+                  <p className="text-sm font-semibold">Profil Akun</p>
                   <p className="text-xs text-muted-foreground">{user?.email ?? "-"}</p>
                 </div>
               </div>
-              
-              <div className="space-y-1.5 pl-6">
-                <Label htmlFor="salesId" className="text-[10px] uppercase tracking-wider text-muted-foreground">Sales ID</Label>
-                <div className="flex gap-2">
-                  <Input 
-                    id="salesId"
-                    placeholder="Masukkan ID Sales" 
-                    value={salesId}
-                    onChange={(e) => setSalesId(e.target.value)}
-                    className="h-8 text-xs"
-                  />
-                  <Button 
-                    size="sm" 
-                    className="h-8 px-3 text-xs"
-                    onClick={handleSaveSalesId}
-                    disabled={isSavingSalesId || !user}
-                  >
-                    {isSavingSalesId ? "..." : "Simpan"}
-                  </Button>
-                </div>
-              </div>
 
-              <div className="space-y-1.5 pl-6">
-                <Label htmlFor="customerCodePrefix" className="text-[10px] uppercase tracking-wider text-muted-foreground">Prefix ID Pelanggan</Label>
-                <div className="flex gap-2">
-                  <Input 
-                    id="customerCodePrefix"
-                    placeholder="A"
-                    maxLength={1}
-                    value={customerCodePrefix}
-                    onChange={(e) => {
-                      const value = e.target.value.toUpperCase();
-                      if (value.length <= 1) {
-                        setCustomerCodePrefix(value);
-                      }
-                    }}
-                    className="h-8 text-xs w-16"
-                  />
-                  <Button 
-                    size="sm" 
-                    className="h-8 px-3 text-xs"
-                    onClick={handleSavePrefix}
-                    disabled={isSavingPrefix || !user}
-                  >
-                    {isSavingPrefix ? "..." : "Simpan"}
-                  </Button>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Autentikasi</Label>
+                  <Dialog open={showChangePasswordDialog} onOpenChange={setShowChangePasswordDialog}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="sm" className="w-full justify-start h-9 text-xs">
+                        <Lock className="w-3.5 h-3.5 mr-2 text-primary" />
+                        Ganti Password Akun
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-sm rounded-2xl">
+                      <DialogHeader>
+                        <DialogTitle className="text-base">Ganti Password</DialogTitle>
+                        <DialogDescription className="text-xs">
+                          Masukkan password baru Anda untuk mengamankan akun.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 py-2">
+                        <div className="space-y-2">
+                          <Label htmlFor="new-password">Password Baru</Label>
+                          <Input
+                            id="new-password"
+                            type="password"
+                            placeholder="Minimal 6 karakter"
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            className="h-10 text-xs"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="confirm-password">Konfirmasi Password</Label>
+                          <Input
+                            id="confirm-password"
+                            type="password"
+                            placeholder="Ulangi password baru"
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            className="h-10 text-xs"
+                          />
+                        </div>
+                      </div>
+                      <DialogFooter className="flex flex-col gap-2 pt-2">
+                        <Button 
+                          className="w-full h-10" 
+                          onClick={handleChangePassword}
+                          disabled={isChangingPassword}
+                        >
+                          {isChangingPassword ? "Memproses..." : "Simpan Password Baru"}
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          className="w-full h-10"
+                          onClick={() => setShowChangePasswordDialog(false)}
+                        >
+                          Batal
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
                 </div>
-                <p className="text-[10px] text-muted-foreground">Contoh: CTM-A00001 (1 huruf)</p>
+
+                <div className="space-y-2">
+                  <Label htmlFor="salesId" className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Sales ID</Label>
+                  <div className="flex gap-2">
+                    <Input 
+                      id="salesId"
+                      placeholder="Contoh: SL-001" 
+                      value={salesId}
+                      onChange={(e) => setSalesId(e.target.value)}
+                      className="h-9 text-xs"
+                    />
+                    <Button 
+                      size="sm" 
+                      className="h-9 px-4 text-xs"
+                      onClick={handleSaveSalesId}
+                      disabled={isSavingSalesId || !user}
+                    >
+                      {isSavingSalesId ? "..." : "Simpan"}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="customerCodePrefix" className="text-[10px] uppercase tracking-wider text-muted-foreground font-bold">Prefix ID Pelanggan</Label>
+                  <div className="flex gap-2">
+                    <Input 
+                      id="customerCodePrefix"
+                      placeholder="A"
+                      maxLength={1}
+                      value={customerCodePrefix}
+                      onChange={(e) => {
+                        const value = e.target.value.toUpperCase();
+                        if (value.length <= 1) {
+                          setCustomerCodePrefix(value);
+                        }
+                      }}
+                      className="h-9 text-xs flex-1"
+                    />
+                    <Button 
+                      size="sm" 
+                      className="h-9 px-4 text-xs"
+                      onClick={handleSavePrefix}
+                      disabled={isSavingPrefix || !user}
+                    >
+                      {isSavingPrefix ? "..." : "Simpan"}
+                    </Button>
+                  </div>
+                  <p className="text-[9px] text-muted-foreground italic">Gunakan 1 huruf (Contoh: CTM-A00001)</p>
+                </div>
               </div>
             </div>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <img src="/padlock.png" alt="Admin" className="w-4 h-4 object-contain" />
+
+            <div className="flex items-center justify-between py-1">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 flex items-center justify-center overflow-hidden">
+                  <img src="/shield.png" alt="Admin" className="w-5 h-5 object-contain" />
+                </div>
                 <div className="space-y-0.5">
                   <p className="text-sm font-medium">Mode Admin</p>
-                  <p className="text-xs text-muted-foreground">Aktifkan Hak Akses Penuh Admin</p>
+                  <p className="text-xs text-muted-foreground">Akses fitur hapus & edit data</p>
                 </div>
               </div>
               <Switch checked={adminMode} onCheckedChange={handleAdminModeToggle} disabled={!isAdmin} />
