@@ -2,7 +2,6 @@ import { useState, useMemo, useEffect } from "react";
 import { useListProducts, useListCustomers, useCreateTransaction, useCreateCustomer, getListCustomersQueryKey } from "@/lib/supabase-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatRupiah, formatNumber, parseNumber, formatDate, normalizeCustomerCode } from "@/lib/format";
-import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +14,6 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { useNotifications } from "@/components/notification-provider";
 import { getSetting, getAllSettings } from "@/lib/supabase-service";
 import { motion } from "framer-motion";
-import { supabase } from "@/lib/supabase";
 
 export function Kasir() {
   const { toast } = useToast();
@@ -40,23 +38,6 @@ export function Kasir() {
 
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const queryClient = useQueryClient();
-
-  useEffect(() => {
-    const channel = supabase
-      .channel('products_realtime')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'products' },
-        () => {
-          queryClient.invalidateQueries({ queryKey: ["products"] });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient]);
 
   // Auto-generate next customer code (CTM-{PREFIX}00001 format)
   const nextCustomerCode = useMemo(() => {
@@ -496,7 +477,7 @@ export function Kasir() {
                     className="h-9 text-xs pl-8"
                   />
                   {showCustomerResults && filteredCustomers.length > 0 && (
-                    <div className="absolute z-50 top-10 left-0 right-0 bg-card border rounded-md shadow-xl max-h-48 overflow-y-auto ring-1 ring-black/5 dark:ring-white/5">
+                    <div className="absolute z-50 top-10 left-0 right-0 bg-white border rounded-md shadow-lg max-h-48 overflow-y-auto">
                       {filteredCustomers.map((c: any) => (
                         <button
                           key={c.id}
@@ -672,9 +653,7 @@ export function Kasir() {
                     }}
                   >
                     <span className="text-xs">{t.label}</span>
-                    <span className={cn("text-xs font-bold", addTierLabel === String(t.label) ? "text-primary-foreground" : "text-primary")}>
-                      {formatRupiah(Number(t.price))}
-                    </span>
+                    <span className="text-xs font-bold">{formatRupiah(Number(t.price))}</span>
                   </Button>
                 ))}
               </div>
