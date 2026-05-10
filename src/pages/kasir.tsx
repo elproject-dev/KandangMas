@@ -165,47 +165,183 @@ export function Kasir() {
 
   const confirmAddToCart = () => {
     if (!addProduct) return;
-    if (addTierLabel === "pending_selection") {
-      toast({ title: "Pilih varian harga", description: "Silakan pilih salah satu varian harga terlebih dahulu", variant: "destructive" });
-      return;
-    }
+    
     const qty = Number(parseNumber(addQty));
     if (!Number.isFinite(qty) || qty <= 0) {
       toast({ title: "Qty tidak valid", variant: "destructive" });
       return;
     }
-    setCart(prev => {
-      const existing = prev.find(item => item.product.id === addProduct.id && item.unitPrice === addUnitPrice && (item.tierLabel || "") === (addTierLabel || ""));
-      if (existing) {
-        return prev.map(item => (item.product.id === addProduct.id && item.unitPrice === addUnitPrice && (item.tierLabel || "") === (addTierLabel || ""))
-          ? { ...item, quantity: item.quantity + qty }
-          : item
-        );
+
+    // Tentukan unit price berdasarkan qty yang dimasukkan (Logika Harga Bertingkat)
+    let finalUnitPrice = addUnitPrice;
+    let finalTierLabel = addTierLabel;
+
+    if (addProduct.priceTiers && addProduct.priceTiers.length > 0) {
+      // Cari tier yang cocok berdasarkan qty. 
+      // Kita asumsikan label berisi angka qty, misal "5 ikat", "10 ikat"
+      // Atau admin bisa set tier berdasarkan qty minimal di masa depan.
+      // Untuk saat ini, kita cari tier yang labelnya mengandung angka qty tersebut.
+      
+      const sortedTiers = [...addProduct.priceTiers].sort((a, b) => {
+        const qtyA = parseInt(String(a.label).match(/\d+/)?.[0] || "0");
+        const qtyB = parseInt(String(b.label).match(/\d+/)?.[0] || "0");
+        return qtyB - qtyA; // Urutkan dari yang terbesar (diskon terbesar)
+      });
+
+      const applicableTier = sortedTiers.find(tier => {
+        const match = String(tier.label).match(/(\d+)/);
+        const minQty = match ? parseInt(match[1]) : 0;
+        return qty >= minQty;
+      });
+
+      if (applicableTier) {
+        // Ambil angka qty dari label tier untuk pembagi
+        const tierQtyMatch = String(applicableTier.label).match(/(\d+)/);
+        const tierQty = tierQtyMatch ? parseInt(tierQtyMatch[1]) : 1;
+        
+        finalUnitPrice = Number(applicableTier.price) / (tierQty || 1);
+        finalTierLabel = String(applicableTier.label);
+      } else {
+        // Jika tidak ada tier yang cocok, gunakan harga dasar
+        finalUnitPrice = Number(addProduct.price);
+        finalTierLabel = "Retail";
       }
-      return [...prev, { product: addProduct, quantity: qty, unitPrice: addUnitPrice, tierLabel: addTierLabel || undefined }];
+    }
+
+    setCart(prev => {
+      // Cari apakah produk sudah ada di keranjang (tanpa melihat tier, karena kita ingin auto-update)
+      const existingIndex = prev.findIndex(item => item.product.id === addProduct.id);
+      
+      if (existingIndex > -1) {
+        // Jika ada, tambahkan qty dan hitung ulang harga tier untuk TOTAL qty
+        const newQty = prev[existingIndex].quantity + qty;
+        
+        // Hitung ulang harga untuk total qty baru
+        let updatedUnitPrice = finalUnitPrice;
+        let updatedTierLabel = finalTierLabel;
+        
+        if (addProduct.priceTiers && addProduct.priceTiers.length > 0) {
+          const sortedTiers = [...addProduct.priceTiers].sort((a, b) => {
+            const qtyA = parseInt(String(a.label).match(/\d+/)?.[0] || "0");
+            const qtyB = parseInt(String(b.label).match(/\d+/)?.[0] || "0");
+            return qtyB - qtyA;
+          });
+
+          const applicableTier = sortedTiers.find(tier => {
+            const match = String(tier.label).match(/(\d+)/);
+            const minQty = match ? parseInt(match[1]) : 0;
+            return newQty >= minQty;
+          });
+
+          if (applicableTier) {
+            const tierQtyMatch = String(applicableTier.label).match(/(\d+)/);
+            const tierQty = tierQtyMatch ? parseInt(tierQtyMatch[1]) : 1;
+            updatedUnitPrice = Number(applicableTier.price) / (tierQty || 1);
+            updatedTierLabel = String(applicableTier.label);
+          } else {
+            updatedUnitPrice = Number(addProduct.price);
+            updatedTierLabel = "Retail";
+          }
+        }
+
+        const newCart = [...prev];
+        newCart[existingIndex] = {
+          ...newCart[existingIndex],
+          quantity: newQty,
+          unitPrice: updatedUnitPrice,
+          tierLabel: updatedTierLabel
+        };
+        return newCart;
+      }
+      
+      return [...prev, { product: addProduct, quantity: qty, unitPrice: finalUnitPrice, tierLabel: finalTierLabel }];
     });
+
     setShowAddProductDialog(false);
     setSearchTerm("");
     setShowServiceList(false);
   };
 
-  const incrementCartItem = (productId: number, unitPrice: number, tierLabel?: string) => {
-    setCart(prev => prev.map(item => (item.product.id === productId && item.unitPrice === unitPrice && (item.tierLabel || "") === (tierLabel || ""))
-      ? { ...item, quantity: item.quantity + 1 }
-      : item
-    ));
+  const incrementCartItem = (productId: number) => {
+    setCart(prev => prev.map(item => {
+      if (item.product.id === productId) {
+        const newQty = item.quantity + 1;
+        let updatedUnitPrice = item.unitPrice;
+        let updatedTierLabel = item.tierLabel;
+
+        // Hitung ulang harga berdasarkan qty baru
+        if (item.product.priceTiers && item.product.priceTiers.length > 0) {
+          const sortedTiers = [...item.product.priceTiers].sort((a, b) => {
+            const qtyA = parseInt(String(a.label).match(/\d+/)?.[0] || "0");
+            const qtyB = parseInt(String(b.label).match(/\d+/)?.[0] || "0");
+            return qtyB - qtyA;
+          });
+
+          const applicableTier = sortedTiers.find(tier => {
+            const match = String(tier.label).match(/(\d+)/);
+            const minQty = match ? parseInt(match[1]) : 0;
+            return newQty >= minQty;
+          });
+
+          if (applicableTier) {
+            const tierQtyMatch = String(applicableTier.label).match(/(\d+)/);
+            const tierQty = tierQtyMatch ? parseInt(tierQtyMatch[1]) : 1;
+            updatedUnitPrice = Number(applicableTier.price) / (tierQty || 1);
+            updatedTierLabel = String(applicableTier.label);
+          } else {
+            updatedUnitPrice = Number(item.product.price);
+            updatedTierLabel = "Retail";
+          }
+        }
+
+        return { ...item, quantity: newQty, unitPrice: updatedUnitPrice, tierLabel: updatedTierLabel };
+      }
+      return item;
+    }));
   };
 
-  const removeFromCart = (productId: number, unitPrice: number, tierLabel?: string) => {
+  const removeFromCart = (productId: number) => {
     setCart(prev => {
-      const existing = prev.find(item => item.product.id === productId && item.unitPrice === unitPrice && (item.tierLabel || "") === (tierLabel || ""));
-      if (existing && existing.quantity > 1) {
-        return prev.map(item => (item.product.id === productId && item.unitPrice === unitPrice && (item.tierLabel || "") === (tierLabel || ""))
-          ? { ...item, quantity: item.quantity - 1 }
-          : item
-        );
+      const existing = prev.find(item => item.product.id === productId);
+      if (!existing) return prev;
+
+      if (existing.quantity > 1) {
+        const newQty = existing.quantity - 1;
+        return prev.map(item => {
+          if (item.product.id === productId) {
+            let updatedUnitPrice = item.unitPrice;
+            let updatedTierLabel = item.tierLabel;
+
+            // Hitung ulang harga berdasarkan qty baru (mungkin turun tier)
+            if (item.product.priceTiers && item.product.priceTiers.length > 0) {
+              const sortedTiers = [...item.product.priceTiers].sort((a, b) => {
+                const qtyA = parseInt(String(a.label).match(/\d+/)?.[0] || "0");
+                const qtyB = parseInt(String(b.label).match(/\d+/)?.[0] || "0");
+                return qtyB - qtyA;
+              });
+
+              const applicableTier = sortedTiers.find(tier => {
+                const match = String(tier.label).match(/(\d+)/);
+                const minQty = match ? parseInt(match[1]) : 0;
+                return newQty >= minQty;
+              });
+
+              if (applicableTier) {
+                const tierQtyMatch = String(applicableTier.label).match(/(\d+)/);
+                const tierQty = tierQtyMatch ? parseInt(tierQtyMatch[1]) : 1;
+                updatedUnitPrice = Number(applicableTier.price) / (tierQty || 1);
+                updatedTierLabel = String(applicableTier.label);
+              } else {
+                updatedUnitPrice = Number(item.product.price);
+                updatedTierLabel = "Retail";
+              }
+            }
+            return { ...item, quantity: newQty, unitPrice: updatedUnitPrice, tierLabel: updatedTierLabel };
+          }
+          return item;
+        });
       }
-      return prev.filter(item => !(item.product.id === productId && item.unitPrice === unitPrice && (item.tierLabel || "") === (tierLabel || "")));
+      return prev.filter(item => item.product.id !== productId);
     });
   };
 
@@ -565,15 +701,15 @@ export function Kasir() {
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-xs leading-tight truncate">{item.product.name}</div>
                       <div className="text-muted-foreground text-xs">
-                        {item.tierLabel ? `${item.tierLabel} · ` : ""}{formatRupiah(item.unitPrice)}
+                        {formatRupiah(item.unitPrice)}
                       </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0 w-28 justify-center">
-                      <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => removeFromCart(Number(item.product.id), item.unitPrice, item.tierLabel)}>
+                      <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => removeFromCart(Number(item.product.id))}>
                         <Minus className="h-3 w-3" />
                       </Button>
                       <span className="w-5 text-center text-xs font-bold">{item.quantity}</span>
-                      <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => incrementCartItem(Number(item.product.id), item.unitPrice, item.tierLabel)}>
+                      <Button variant="outline" size="icon" className="h-6 w-6" onClick={() => incrementCartItem(Number(item.product.id))}>
                         <Plus className="h-3 w-3" />
                       </Button>
                     </div>
@@ -614,68 +750,69 @@ export function Kasir() {
                 {createTransaction.isPending ? "Memproses..." : "Proses Transaksi"}
               </Button>
             </motion.div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full text-xs text-muted-foreground mt-1"
+              onClick={() => window.location.reload()}
+            >
+              Refresh Order
+            </Button>
             {cart.length > 0 && (
               <Button
                 variant="ghost"
                 size="sm"
-                className="w-full text-xs text-muted-foreground"
-                onClick={() => window.location.reload()}
+                className="w-full text-xs text-muted-foreground opacity-50 hover:opacity-100"
+                onClick={() => setCart([])}
               >
-                Refresh Order
+                Kosongkan Keranjang
               </Button>
             )}
           </CardFooter>
         </Card>
       </div>
 
-      <Dialog open={showAddProductDialog} onOpenChange={setShowAddProductDialog}>
+   <Dialog open={showAddProductDialog} onOpenChange={setShowAddProductDialog}>
         <DialogContent className="max-w-sm mx-auto rounded-2xl">
           <DialogHeader>
-            <DialogTitle>Pilih Varian & Qty</DialogTitle>
+            <DialogTitle>Masukkan Qty</DialogTitle>
             <DialogDescription>
               {addProduct ? addProduct.name : ""}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label className="text-xs">Varian Harga</Label>
-              <div className="flex flex-col gap-2">
-                {(addProduct?.priceTiers ?? []).map((t) => (
-                  <Button
-                    key={`${t.label}-${t.price}`}
-                    type="button"
-                    variant={addTierLabel === String(t.label) ? "default" : "outline"}
-                    className="h-10 justify-between"
-                    onClick={() => {
-                      setAddTierLabel(String(t.label));
-                      setAddUnitPrice(Number(t.price));
-                    }}
-                  >
-                    <span className="text-xs">{t.label}</span>
-                    <span className="text-xs font-bold">{formatRupiah(Number(t.price))}</span>
-                  </Button>
-                ))}
-              </div>
-            </div>
-
             <div className="space-y-1.5">
-              <Label className="text-xs">Qty</Label>
+              <Label className="text-xs">Jumlah (Qty)</Label>
               <Input
                 type="text"
                 inputMode="numeric"
                 value={addQty}
                 onChange={(e) => setAddQty(e.target.value)}
                 className="h-10"
+                autoFocus
               />
             </div>
+
+            {addProduct && addProduct.priceTiers && addProduct.priceTiers.length > 0 && (
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground font-semibold">Info Harga Grosir:</Label>
+                <div className="bg-primary/5 rounded-lg p-3 space-y-1.5 border border-primary/10">
+                  {addProduct.priceTiers.map((t, i) => (
+                    <div key={i} className="flex justify-between text-xs">
+                      <span className="font-bold text-primary">{t.label}</span>
+                      <span className="font-bold text-primary">{formatRupiah(Number(t.price))}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <DialogFooter className="flex flex-col gap-2">
             <Button 
               type="button" 
               onClick={confirmAddToCart}
-              disabled={addTierLabel === "pending_selection"}
               className="w-full"
             >
               Tambah ke Keranjang

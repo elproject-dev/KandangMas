@@ -73,7 +73,7 @@ export function Layanan() {
       const data = [
         {
           "Nama Produk": "Kertas Nasi MB 25 x 35",
-          "Varian": "1 bal",
+          "Qty": "1",
           "Harga Jual": 40000,
           "HPP": 35000,
           "Satuan": "bal",
@@ -81,7 +81,7 @@ export function Layanan() {
         },
         {
           "Nama Produk": "Kertas Nasi MB 25 x 35",
-          "Varian": "5 bal",
+          "Qty": "5",
           "Harga Jual": 120000,
           "HPP": 100000,
           "Satuan": "bal",
@@ -89,7 +89,7 @@ export function Layanan() {
         },
         {
           "Nama Produk": "Sendok Makan Jerapah PS",
-          "Varian": "1 dus",
+          "Qty": "1",
           "Harga Jual": 40000,
           "HPP": 32000,
           "Satuan": "dus",
@@ -103,7 +103,7 @@ export function Layanan() {
       
       const wscols = [
         { wch: 30 }, // Nama Produk
-        { wch: 15 }, // Varian
+        { wch: 10 }, // Qty
         { wch: 15 }, // Harga Jual
         { wch: 15 }, // HPP
         { wch: 10 }, // Satuan
@@ -185,7 +185,7 @@ export function Layanan() {
 
         for (const item of data) {
           const name = item["Nama Produk"];
-          const variantLabel = item["Varian"];
+          const qtyValue = item["Qty"] || item["Varian"] || "1";
           const price = Number(item["Harga Jual"] || item["Harga"] || 0);
           const hpp = Number(item["HPP"] || 0);
           const unit = item["Satuan"] || "pcs";
@@ -204,7 +204,7 @@ export function Layanan() {
 
           const product = groupedProducts.get(name);
           product.priceTiers.push({
-            label: variantLabel || "Default",
+            label: qtyValue,
             price,
             hpp
           });
@@ -411,7 +411,7 @@ export function Layanan() {
                       </div>
 
                       <span className="inline-flex text-[10px] text-muted-foreground px-1.5 py-0.5 bg-muted rounded-full shrink-0">
-                        {s.priceTiers?.length || 0} Varian
+                        {s.priceTiers?.length || 0} varian
                       </span>
                     </div>
 
@@ -526,7 +526,7 @@ export function Layanan() {
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label>Varian</Label>
+                <Label>Harga Berdasarkan Qty</Label>
                 <Button
                   type="button"
                   variant="outline"
@@ -537,11 +537,11 @@ export function Layanan() {
                     priceTiers: [...(f.priceTiers || []), { label: "", price: "", hpp: "" }],
                   }))}
                 >
-                  Tambah Varian
+                  Tambah Qty
                 </Button>
               </div>
               {(form.priceTiers || []).length === 0 ? (
-                <div className="text-xs text-muted-foreground">Belum ada varian harga</div>
+                <div className="text-xs text-muted-foreground">Belum ada pengaturan harga qty</div>
               ) : (
                 <div className="space-y-3">
                   {(form.priceTiers || []).map((t, idx) => (
@@ -550,7 +550,7 @@ export function Layanan() {
                         <div className="flex gap-2 items-start">
                           <div className="flex-1 relative">
                             <Input
-                              placeholder="Nama varian (contoh: 1 Box / Satuan)"
+                              placeholder="Minimal Qty (contoh: 1 atau 5)"
                               value={t.label}
                               onChange={(e) => setForm(f => ({
                                 ...f,

@@ -214,7 +214,13 @@ export function Dashboard() {
           if (p) {
             if (item?.tierLabel && Array.isArray(p?.priceTiers)) {
               const tier = (p.priceTiers as any[]).find((pt) => pt?.label === item.tierLabel);
-              hpp = Number(tier?.hpp ?? p?.hpp ?? 0) || 0;
+              if (tier) {
+                const tierQty = parseInt(String(tier.label).match(/\d+/)?.[0] || "1");
+                const baseHpp = Number(tier.hpp ?? p.hpp ?? 0);
+                hpp = baseHpp / tierQty; // Hitung HPP SATUAN
+              } else {
+                hpp = Number(p?.hpp ?? 0) || 0;
+              }
             } else {
               hpp = Number(p?.hpp ?? 0) || 0;
             }
@@ -649,7 +655,7 @@ export function Dashboard() {
       ];
 
       const variantColumn = [
-        { header: isAdminExport ? 'Qty' : 'Variant', key: 'varian', width: 12 },
+        { header: 'Variant', key: 'varian', width: 12 },
       ];
 
       const afterProductColumns = [
@@ -672,11 +678,11 @@ export function Dashboard() {
       ];
 
       const showMarginInfo = isAdminExport;
-      const showVariant = true; // Muncul di mode admin dan sales
+      const showVariant = false; // Sembunyikan untuk admin dan sales
       
       let finalColumns = [...baseColumns];
       if (showVariant) finalColumns = [...finalColumns, ...variantColumn];
-      if (!isAdminExport) finalColumns = [...finalColumns, ...qtyColumn];
+      finalColumns = [...finalColumns, ...qtyColumn];
       finalColumns = [...finalColumns, ...afterProductColumns];
       if (showMarginInfo) finalColumns = [...finalColumns, ...marginColumns];
       finalColumns = [...finalColumns, ...periodColumns];
@@ -771,7 +777,9 @@ export function Dashboard() {
             if (product) {
               if (item.tierLabel && product.priceTiers) {
                 const tier = product.priceTiers.find((pt: any) => pt.label === item.tierLabel);
-                itemHpp = tier?.hpp ?? product.hpp ?? 0;
+                const tierQty = parseInt(String(tier?.label || item.tierLabel).match(/\d+/)?.[0] || "1");
+                const baseHpp = Number(tier?.hpp ?? product.hpp ?? 0);
+                itemHpp = baseHpp / tierQty; // Hitung HPP SATUAN
               } else {
                 itemHpp = product.hpp ?? 0;
               }
@@ -782,7 +790,7 @@ export function Dashboard() {
           
           const variantValue = item.tierLabel ? item.tierLabel.replace(/[^0-9]/g, '') : null;
           
-          const row = worksheet.addRow({
+          const rowData: any = {
             tanggal: formattedDate,
             jam: time,
             idPelanggan: t.customerCode || '-',
@@ -794,9 +802,9 @@ export function Dashboard() {
             kabupaten: t.customerKab || '-',
             namaProduk: item.productName || item.serviceName || '-',
             varian: variantValue ? Number(variantValue) : '-',
-            qty: isAdminExport ? undefined : (item.quantity || 0),
-            harga: (isAdminExport && variantValue && Number(variantValue) > 0) 
-              ? (itemTotal / Number(variantValue)) 
+            qty: (item.quantity || 0),
+            harga: (item.quantity && item.quantity > 0) 
+              ? (itemTotal / item.quantity) 
               : (item.price || 0),
             total: itemTotal,
             subtotal: t.total || 0,
@@ -804,7 +812,9 @@ export function Dashboard() {
             margin: showMarginInfo ? itemMargin : undefined,
             periodeBulan: t.periodeMonth ? ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"][(t.periodeMonth - 1)] || t.periodeMonth : '-',
             periodeTahun: t.periodeYear || '-',
-          });
+          };
+
+          const row = worksheet.addRow(rowData);
  
           // Apply alternating fill color + border per row (no merge)
           for (let c = 1; c <= lastColumnIndex; c++) {

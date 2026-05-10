@@ -328,11 +328,9 @@ export function Transaksi() {
                       <div className="flex-1">
                         <span className="font-medium">{item.quantity}x</span>
                         <span className="ml-2">{item.productName}</span>
-                        {item.tierLabel && (
-                          <span className="ml-2 text-[10px] text-muted-foreground px-1 py-0.5 bg-muted rounded">
-                            {item.tierLabel}
-                          </span>
-                        )}
+                        <span className="ml-2 text-[10px] text-muted-foreground">
+                          @{formatRupiah(item.price)}
+                        </span>
                       </div>
                       <span className="font-medium">{formatRupiah(item.subtotal)}</span>
                     </div>
