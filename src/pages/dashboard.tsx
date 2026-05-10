@@ -649,13 +649,16 @@ export function Dashboard() {
       ];
 
       const variantColumn = [
-        { header: 'Variant', key: 'varian', width: 12 },
+        { header: isAdminExport ? 'Qty' : 'Variant', key: 'varian', width: 12 },
       ];
 
       const afterProductColumns = [
-        { header: 'Qty', key: 'qty', width: 6 },
         { header: 'Price', key: 'harga', width: 12 },
         { header: 'Total', key: 'total', width: 12 },
+      ];
+
+      const qtyColumn = [
+        { header: 'Qty', key: 'qty', width: 6 },
       ];
 
       const marginColumns = [
@@ -669,10 +672,11 @@ export function Dashboard() {
       ];
 
       const showMarginInfo = isAdminExport;
-      const showVariant = !isAdminExport; // Khusus mode sales
+      const showVariant = true; // Muncul di mode admin dan sales
       
       let finalColumns = [...baseColumns];
       if (showVariant) finalColumns = [...finalColumns, ...variantColumn];
+      if (!isAdminExport) finalColumns = [...finalColumns, ...qtyColumn];
       finalColumns = [...finalColumns, ...afterProductColumns];
       if (showMarginInfo) finalColumns = [...finalColumns, ...marginColumns];
       finalColumns = [...finalColumns, ...periodColumns];
@@ -776,6 +780,8 @@ export function Dashboard() {
           
           const itemMargin = (item.price - itemHpp) * (item.quantity || 0);
           
+          const variantValue = item.tierLabel ? item.tierLabel.replace(/[^0-9]/g, '') : null;
+          
           const row = worksheet.addRow({
             tanggal: formattedDate,
             jam: time,
@@ -787,9 +793,11 @@ export function Dashboard() {
             kecamatan: t.customerKecamatan || '-',
             kabupaten: t.customerKab || '-',
             namaProduk: item.productName || item.serviceName || '-',
-            varian: showVariant ? (item.tierLabel || '-') : undefined,
-            qty: item.quantity || 0,
-            harga: item.price || 0,
+            varian: variantValue ? Number(variantValue) : '-',
+            qty: isAdminExport ? undefined : (item.quantity || 0),
+            harga: (isAdminExport && variantValue && Number(variantValue) > 0) 
+              ? (itemTotal / Number(variantValue)) 
+              : (item.price || 0),
             total: itemTotal,
             subtotal: t.total || 0,
             hpp: showMarginInfo ? itemHpp * (item.quantity || 0) : undefined,
@@ -898,7 +906,10 @@ export function Dashboard() {
           if (kecamatanIdx > 0) row.getCell(kecamatanIdx).alignment = { horizontal: 'center', vertical: 'middle' };
           if (kabupatenIdx > 0) row.getCell(kabupatenIdx).alignment = { horizontal: 'center', vertical: 'middle' };
           if (productIdx > 0) row.getCell(productIdx).alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
-          if (variantIdx > 0) row.getCell(variantIdx).alignment = { horizontal: 'center', vertical: 'middle' };
+          if (variantIdx > 0) {
+            row.getCell(variantIdx).numFmt = '#,##0';
+            row.getCell(variantIdx).alignment = { horizontal: 'center', vertical: 'middle' };
+          }
           if (qtyIdx > 0) {
             row.getCell(qtyIdx).numFmt = '#,##0';
             row.getCell(qtyIdx).alignment = { horizontal: 'center', vertical: 'middle' };
