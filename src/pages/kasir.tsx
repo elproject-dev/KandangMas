@@ -143,8 +143,8 @@ export function Kasir() {
         if (data.customerName) {
           // Find customer by name or phone
           const customer = customers?.find(c => c.name === data.customerName || c.phone === data.customerPhone);
-          if (customer) {
-            setSelectedCustomerId(customer.id.toString());
+          if (customer && customer.id != null) {
+            setSelectedCustomerId(String(customer.id));
           }
         }
         // Clear the localStorage after loading
@@ -347,10 +347,35 @@ export function Kasir() {
 
   const filteredCustomers = useMemo(() => {
     if (!customerSearch.trim()) return [];
-    const q = customerSearch.toLowerCase().trim();
-    return (customers || []).filter((c: any) =>
-      c.name?.toLowerCase().includes(q) || c.phone?.replace(/\D/g, '').includes(q.replace(/\D/g, ''))
-    ).slice(0, 10);
+    const raw = customerSearch.trim();
+    const q = raw.toLowerCase();
+    const qDigits = raw.replace(/\D/g, '');
+    const qCode = raw.replace(/[^a-z0-9]/gi, '').toLowerCase();
+
+    return (customers || []).filter((c: any) => {
+      // name match
+      if (c.name && String(c.name).toLowerCase().includes(q)) return true;
+
+      // phone match (compare numeric digits)
+      if (c.phone) {
+        const phoneDigits = String(c.phone).replace(/\D/g, '');
+        if (qDigits && phoneDigits.includes(qDigits)) return true;
+      }
+
+      // code match (normalized, allow CTM/C variants, with or without hyphen)
+      if (c.code) {
+        const norm = normalizeCustomerCode(String(c.code)).toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (qCode && norm.includes(qCode)) return true;
+        if (String(c.code).toLowerCase().replace(/[^a-z0-9]/g, '').includes(qCode)) return true;
+      }
+
+      // address / location match
+      if (c.address && String(c.address).toLowerCase().includes(q)) return true;
+      if (c.kab && String(c.kab).toLowerCase().includes(q)) return true;
+      if (c.kecamatan && String(c.kecamatan).toLowerCase().includes(q)) return true;
+
+      return false;
+    }).slice(0, 10);
   }, [customers, customerSearch]);
 
   const handleSelectCustomer = (c: any) => {
